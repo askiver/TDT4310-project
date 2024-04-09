@@ -12,7 +12,7 @@ def load_data(file_path):
 
 
 # Class for loading word embeddings from file
-def create_tensor_dataset(spacy_model='sm', batch_size=32, test_size=0.2, flat_tensor=False):
+def create_tensor_dataset(spacy_model='sm', batch_size=32, test_size=0.2, train_size=0.2, flat_tensor=False):
     # Load data
     train_data_pos = load_data(f'data/embeddings/train/pos_spacy_model_{spacy_model}_embeddings.h5')
     train_data_neg = load_data(f'data/embeddings/train/neg_spacy_model_{spacy_model}_embeddings.h5')
@@ -24,7 +24,9 @@ def create_tensor_dataset(spacy_model='sm', batch_size=32, test_size=0.2, flat_t
     positive_embeddings_test = test_data_pos['pos']
     negative_embeddings_test = test_data_neg['neg']
 
-    # Reduce size of test
+    # Reduce size of data
+    positive_embeddings_train = positive_embeddings_train[:int(len(positive_embeddings_train)*train_size)]
+    negative_embeddings_train = negative_embeddings_train[:int(len(negative_embeddings_train)*train_size)]
     positive_embeddings_test = positive_embeddings_test[:int(len(positive_embeddings_test)*test_size)]
     negative_embeddings_test = negative_embeddings_test[:int(len(negative_embeddings_test)*test_size)]
 

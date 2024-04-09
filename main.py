@@ -20,7 +20,7 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 BATCH_SIZE = 64
 EPOCHS = 50
 LEARNING_RATE = 1e-5
-WEIGHT_DECAY = 1e-2
+WEIGHT_DECAY = 1e-0
 EMBEDDING_LENGTH = 200
 SPACY_MODEL = 'lg'
 
