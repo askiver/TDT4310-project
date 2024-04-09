@@ -12,7 +12,7 @@ def load_data(file_path):
 
 
 # Class for loading word embeddings from file
-def create_tensor_dataset(spacy_model='sm', batch_size=32, test_size=0.2):
+def create_tensor_dataset(spacy_model='sm', batch_size=32, test_size=0.2, flat_tensor=False):
     # Load data
     train_data_pos = load_data(f'data/embeddings/train/pos_spacy_model_{spacy_model}_embeddings.h5')
     train_data_neg = load_data(f'data/embeddings/train/neg_spacy_model_{spacy_model}_embeddings.h5')
@@ -48,9 +48,14 @@ def create_tensor_dataset(spacy_model='sm', batch_size=32, test_size=0.2):
     labels_train = torch.tensor(labels_train).float()
     labels_test = torch.tensor(labels_test).float()
 
-    # insert channel dimension
-    embeddings_train = embeddings_train.unsqueeze(1)
-    embeddings_test = embeddings_test.unsqueeze(1)
+
+    if flat_tensor:
+        embeddings_train = embeddings_train.transpose(1, 2)
+        embeddings_test = embeddings_test.transpose(1, 2)
+    else:
+        # insert channel dimension
+        embeddings_train = embeddings_train.unsqueeze(1)
+        embeddings_test = embeddings_test.unsqueeze(1)
 
     # Create dataset
     dataset_train = TensorDataset(embeddings_train, labels_train)
