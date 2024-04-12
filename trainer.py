@@ -5,6 +5,10 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 from torch.cuda.amp import GradScaler, autocast
 
+def add_gaussian_noise(data, std=6):
+    # Create noise with the same shape as the batch
+    noise = torch.randn_like(data) * std
+    return data + noise
 
 class Trainer:
 
@@ -20,8 +24,7 @@ class Trainer:
         self.loss_test_history = []
         self.test_accuracy_history = []
 
-    def train(self, train_loader, test_loader, epochs=50, save_models=False, plot_loss=False):
-        scaler = GradScaler()
+    def train(self, train_loader, test_loader, epochs=50, save_models=False, plot_loss=False, add_noise=True):
 
         # Create a directory for training date to be saved
         if save_models:
@@ -39,6 +42,8 @@ class Trainer:
 
             train_loss = []
             for features, target in tqdm(train_loader, total=len(train_loader)):
+                if add_noise:
+                    features = add_gaussian_noise(features)
                 features, target = features.to(self.device), target.to(self.device)
                 self.optimizer.zero_grad()
                 #with autocast():
