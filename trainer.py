@@ -24,7 +24,7 @@ class Trainer:
         self.loss_test_history = []
         self.test_accuracy_history = []
 
-    def train(self, train_loader, test_loader, epochs=50, save_models=False, plot_loss=False, add_noise=True):
+    def train(self, train_loader, test_loader, epochs=50, save_models=False, plot_loss=False, add_noise=True, noise_std=6):
 
         # Create a directory for training date to be saved
         if save_models:
@@ -43,7 +43,7 @@ class Trainer:
             train_loss = []
             for features, target in tqdm(train_loader, total=len(train_loader)):
                 if add_noise:
-                    features = add_gaussian_noise(features)
+                    features = add_gaussian_noise(features, noise_std)
                 features, target = features.to(self.device), target.to(self.device)
                 self.optimizer.zero_grad()
                 #with autocast():

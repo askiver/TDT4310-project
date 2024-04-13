@@ -5,16 +5,16 @@ from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
 
 
-def load_data(file_path):
+def load_data(file_path, data_label, data_size):
     with h5py.File(file_path, 'r') as hdf:
-        data = {key: hdf[key][()] for key in hdf.keys()}
+        dataset = hdf[data_label]
+        # Load all data from the dataset
+        data = dataset[:int(data_size*len(dataset))]
     return data
 
 
 def load_movie_reviews(spacy_model='sm', data_size=0.2, data_type='train', data_label='pos'):
-    data = load_data(f'data/embeddings/{data_type}/{data_label}_spacy_model_{spacy_model}_embeddings.h5')
-
-    data = data[data_label][:int(len(data[data_label]) * data_size)]
+    data = load_data(f'data/embeddings/{data_type}/{data_label}_spacy_model_{spacy_model}_embeddings.h5', data_label, data_size)
 
     if data_label == 'pos':
         labels = np.ones(len(data))
@@ -25,7 +25,7 @@ def load_movie_reviews(spacy_model='sm', data_size=0.2, data_type='train', data_
 
 
 # Class for loading word embeddings from file
-def create_tensor_dataset(spacy_model='sm', batch_size=32, test_size=0.2, train_size=1.0, flat_tensor=False):
+def create_tensor_dataset(spacy_model='sm', batch_size=32, test_size=0.2, train_size=0.2, flat_tensor=False):
     # Load data
     positive_embeddings_train, positive_labels_train = load_movie_reviews(spacy_model, data_size=train_size,
                                                                           data_type='train', data_label='pos')
