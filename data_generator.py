@@ -1,11 +1,14 @@
 import os
+
+import numpy as np
 import spacy
 from tqdm import tqdm
 import h5py
-from multiprocessing import Pool
 from transformers import RobertaTokenizer, RobertaModel
 import torch
 from torch.utils.data import DataLoader, Dataset
+from utils import load_combined_reviews
+
 
 class ReviewDataset(Dataset):
     def __init__(self, reviews, tokenizer, max_length=512):
@@ -18,67 +21,35 @@ class ReviewDataset(Dataset):
 
     def __getitem__(self, idx):
         review = self.reviews[idx]
-        return self.tokenizer(review, add_special_tokens=True, padding='max_length', truncation=True, max_length=self.max_length, return_tensors='pt')
+        return self.tokenizer(review, add_special_tokens=True, padding='max_length', truncation=True,
+                              max_length=self.max_length, return_tensors='pt')
 
 
-# File for creating the dataset
-# Converts the reviews into word embeddings
-def load_movie_reviews(folder):
-    reviews = []
-    for filename in os.listdir(folder):
-        filepath = f'{folder}/{filename}'
-        with open(filepath, 'r', encoding='utf-8') as file:
-            review = file.read()
-            reviews.append(review)
-    return reviews
-
-
-def remove_breaks(reviews):
-    return [review.replace('<br /><br />', '') for review in reviews]
-
-
-def create_embeddings_spacy(reviews, spacy_model):
+def create_embeddings_spacy(reviews, spacy_model, vector_length=300, embedding_length=200):
     nlp = spacy.load(f'en_core_web_{spacy_model}')
-    embeddings = []
+    embeddings = np.zeros((len(reviews), embedding_length, vector_length), dtype=np.float32)
 
-    for doc in tqdm(nlp.pipe(reviews, batch_size=500), total=len(reviews)):
-        embeddings.append([token.vector.tolist() for token in doc if not token.is_stop])
+    for ind, doc in tqdm(enumerate(nlp.pipe(reviews, batch_size=500)), total=len(reviews)):
+        word_vectors = [token.vector for token in doc if not token.is_stop and token.has_vector][:embedding_length]
+        vector_count = min(len(word_vectors), embedding_length)
+        embeddings[ind, :, :vector_count] = word_vectors[:vector_count]
     return embeddings
 
 
-def normalize_embedding_length(embeddings, chosen_length=100, vector_length=768):
-    # Normalize the length of the embeddings
-    normalized_embeddings = []
-    for embedding in embeddings:
-        if len(embedding) > chosen_length:
-            normalized_embedding = embedding[:chosen_length]
-        else:
-            normalized_embedding = embedding + [[0] * vector_length] * (chosen_length - len(embedding))
-        normalized_embeddings.append(normalized_embedding)
-    return normalized_embeddings
-
-
-def save_word_embeddings(data_type, data_label, word_embeddings, spacy_model):
+def save_word_embeddings(data_type, data_label, word_embeddings, scores, spacy_model):
     with h5py.File(f'data/embeddings/{data_type}/{data_label}_spacy_model_{spacy_model}_embeddings.h5', 'w') as hdf:
-        hdf.create_dataset(data_label, data=word_embeddings)
+        hdf.create_dataset('embeddings', data=word_embeddings, dtype=np.float32)
+        hdf.create_dataset('scores', data=scores, dtype=np.int8)
 
 
-def clear_file_contents(data_type, data_label, spacy_model):
-    with h5py.File(f'data/embeddings/{data_type}/{data_label}_spacy_model_{spacy_model}_embeddings.h5', 'w') as hdf:
-        pass
-
-
-def create_embedding_bert(reviews):
-    tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
-    model = RobertaModel.from_pretrained('roberta-base')
-
+def create_embedding_bert(reviews, model, tokenizer, vector_length=768, embedding_length=200):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     model.eval()  # Set model to evaluation mode
 
     # Create the dataset and data loader
     dataset = ReviewDataset(reviews, tokenizer)
-    data_loader = DataLoader(dataset, batch_size=128, shuffle=False)
+    data_loader = DataLoader(dataset, batch_size=180, shuffle=False, num_workers=8)
 
     embeddings = []
 
@@ -89,27 +60,33 @@ def create_embedding_bert(reviews):
 
         with torch.no_grad():
             output = model(input_ids=input_ids, attention_mask=attention_mask)
-            embeddings.append(output.last_hidden_state.to('cpu'))
+            batch_embeddings = output.last_hidden_state[:, :embedding_length]
+            if batch_embeddings.shape[1] < embedding_length:
+                padding = torch.zeros(
+                    (batch_embeddings.shape[0], embedding_length - batch_embeddings.shape[1], batch_embeddings.shape[2]),
+                    device=device)
+                batch_embeddings = torch.cat([batch_embeddings, padding], dim=1)
+            embeddings.append(batch_embeddings.to('cpu'))
 
     # Concatenate all batch embeddings and move to CPU if needed
-    embeddings = torch.cat(embeddings, dim=0).to('cpu')
+    embeddings = torch.cat(embeddings, dim=0)
 
     return embeddings
 
 
-def create_dataset(data_type, data_label, spacy_model, embedding_length):
-    reviews = load_movie_reviews(f'data/{data_type}/{data_label}')
+def create_dataset(bert_model, bert_tokenizer, data_type, data_label, spacy_model, embedding_length, vector_length):
+    reviews, scores = load_combined_reviews(data_type, data_label)
 
-    reviews = remove_breaks(reviews)
+    # Limit amount of reviews for testing
+    reviews = reviews
+    scores = scores
 
     if spacy_model == 'bert':
-        embeddings = create_embedding_bert(reviews)
+        embeddings = create_embedding_bert(reviews, bert_model, bert_tokenizer)
     else:
         embeddings = create_embeddings_spacy(reviews, spacy_model)
 
-    embeddings = normalize_embedding_length(embeddings, embedding_length)
-
-    save_word_embeddings(data_type, data_label, embeddings, spacy_model)
+    save_word_embeddings(data_type, data_label, embeddings, scores, spacy_model)
 
 
 def main():
@@ -117,12 +94,19 @@ def main():
     data_types = ['train', 'test']
     labels = ['pos', 'neg']
     embedding_length = 200
-    vector_length = 768
-    # clear files
+    vector_length = 768 if spacy_model == 'bert' else 300
+
+    tokenizer = None
+    model = None
+
+    if spacy_model == 'bert':
+        tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+        model = RobertaModel.from_pretrained('roberta-base')
     for data_type in data_types:
         for label in labels:
-            #clear_file_contents(data_type, label, spacy_model)
-            create_dataset(data_type, label, spacy_model=spacy_model, embedding_length=embedding_length)
+            create_dataset(model, tokenizer, data_type, label, spacy_model=spacy_model,
+                           embedding_length=embedding_length,
+                           vector_length=vector_length)
             print(f'Finished creating {data_type} {label} dataset')
 
 

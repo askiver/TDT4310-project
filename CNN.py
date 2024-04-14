@@ -118,6 +118,7 @@ class FlatCNN(nn.Module):
         x = self.forward(x)
         return torch.round(torch.sigmoid(x))
 
+
     def to(self, device):
         for net in self.conv_layers:
             for layer in net:
@@ -134,7 +135,7 @@ class FlatCNN(nn.Module):
 
 
 class SimpleFlatCNN(nn.Module):
-    def __init__(self, embedding_length=200, vector_dimension=768, kernel_size=5, output_channels=64):
+    def __init__(self, binary_classification=True, embedding_length=200, vector_dimension=300, kernel_size=5, output_channels=64):
         super(SimpleFlatCNN, self).__init__()
         self.conv1 = nn.Conv1d(vector_dimension, output_channels, kernel_size=kernel_size, padding=(kernel_size - 1)//2)
         self.conv2 = nn.Conv1d(output_channels, output_channels * 2, kernel_size=kernel_size, padding=(kernel_size - 1)//2)
@@ -155,6 +156,8 @@ class SimpleFlatCNN(nn.Module):
         self.average_pool = nn.AvgPool1d(kernel_size=2, stride=2)
         self.pool = self.max_pool
 
+        self.final_act = nn.Identity() if binary_classification else nn.ReLU()
+
     def forward(self, x):
         x = self.GELU(self.bn1(self.conv1(x)))
         x = self.pool(x)
@@ -165,9 +168,17 @@ class SimpleFlatCNN(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.GELU(self.bn4(self.fc1(x)))
         x = self.GELU(self.bn5(self.fc2(x)))
-        x = self.fc3(x)
-        return x.squeeze_(-1)
+        x = self.final_act(self.fc3(x))
+        if x.size(-1) == 1:
+            x = x.squeeze(-1)
+        return x
 
     def forward_accuracy(self, x):
         x = self.forward(x)
         return torch.round(torch.sigmoid(x))
+
+    def forward_score(self, x):
+        x = self.forward(x)
+        x = torch.clamp(x, min=1, max=8)
+        # Return the score rounded to the nearest integer
+        return torch.round(x)

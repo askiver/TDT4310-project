@@ -12,12 +12,13 @@ def add_gaussian_noise(data, std=6):
 
 class Trainer:
 
-    def __init__(self, model, device, lr=0.0001, weight_decay=1e-4):
+    def __init__(self, model, device, lr=0.0001, weight_decay=1e-4, binary_classification=True):
         self.model = model
         self.model = self.model.to(device)
         self.device = device
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
-        self.criterion = torch.nn.BCEWithLogitsLoss()
+        self.binary_classification = binary_classification
+        self.criterion = torch.nn.BCEWithLogitsLoss() if binary_classification else torch.nn.MSELoss()
 
         # Loss history
         self.loss_train_history = []
@@ -46,14 +47,10 @@ class Trainer:
                     features = add_gaussian_noise(features, noise_std)
                 features, target = features.to(self.device), target.to(self.device)
                 self.optimizer.zero_grad()
-                #with autocast():
                 outputs = self.model(features)
                 loss = self.criterion(outputs, target)
                 loss.backward()
                 self.optimizer.step()
-                #scaler.scale(loss).backward()
-                #scaler.step(self.optimizer)
-                #scaler.update()
 
                 train_loss.append(loss.item())
 
@@ -71,8 +68,12 @@ class Trainer:
             with torch.no_grad():
                 for features, target in tqdm(test_loader, total=len(test_loader)):
                     features, target = features.to(self.device), target.to(self.device)
-                    outputs = self.model.forward_accuracy(features)
-                    test_accuracy += torch.sum(outputs == target).item()
+                    if self.binary_classification:
+                        outputs = self.model.forward_accuracy(features)
+                        test_accuracy += torch.sum(outputs == target).item()
+                    else:
+                        outputs = self.model(features)
+                        test_accuracy += torch.sum(torch.abs(outputs - target) < 0.5).item()
 
             # Save loss
             self.loss_train_history.append((sum(train_loss) / len(train_loss)))
