@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 import spacy
 from tqdm import tqdm
@@ -30,9 +28,9 @@ def create_embeddings_spacy(reviews, spacy_model, vector_length=300, embedding_l
     embeddings = np.zeros((len(reviews), embedding_length, vector_length), dtype=np.float32)
 
     for ind, doc in tqdm(enumerate(nlp.pipe(reviews, batch_size=500)), total=len(reviews)):
-        word_vectors = [token.vector for token in doc if not token.is_stop and token.has_vector][:embedding_length]
+        word_vectors = [token.vector for token in doc][:embedding_length]
         vector_count = min(len(word_vectors), embedding_length)
-        embeddings[ind, :, :vector_count] = word_vectors[:vector_count]
+        embeddings[ind, :vector_count, :] = word_vectors[:vector_count]
     return embeddings
 
 
@@ -90,7 +88,7 @@ def create_dataset(bert_model, bert_tokenizer, data_type, data_label, spacy_mode
 
 
 def main():
-    spacy_model = 'bert'
+    spacy_model = 'lg'
     data_types = ['train', 'test']
     labels = ['pos', 'neg']
     embedding_length = 200

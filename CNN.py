@@ -137,6 +137,7 @@ class FlatCNN(nn.Module):
 class SimpleFlatCNN(nn.Module):
     def __init__(self, binary_classification=True, embedding_length=200, vector_dimension=300, kernel_size=5, output_channels=64):
         super(SimpleFlatCNN, self).__init__()
+        self.name = "SimpleFlatCNN"
         self.conv1 = nn.Conv1d(vector_dimension, output_channels, kernel_size=kernel_size, padding=(kernel_size - 1)//2)
         self.conv2 = nn.Conv1d(output_channels, output_channels * 2, kernel_size=kernel_size, padding=(kernel_size - 1)//2)
         self.conv3 = nn.Conv1d(output_channels * 2, output_channels * 4, kernel_size=kernel_size,

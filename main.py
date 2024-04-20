@@ -1,12 +1,16 @@
 import random
 import numpy as np
 import torch
+from sklearn.metrics import mean_absolute_error, f1_score, precision_score, recall_score, classification_report
+
 from CNN import CNN, LargeCNN, FlatCNN, SimpleFlatCNN
 from data_loader import create_tensor_dataset
 from trainer import Trainer
 
 
 def set_seed(seed=0):
+    #torch.backends.cudnn.deterministic = True
+    #torch.backends.cudnn.benchmark = False
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -18,41 +22,89 @@ def set_seed(seed=0):
 SEED = 0
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 BATCH_SIZE = 32
-EPOCHS = 25
+EPOCHS = 10
 SPACY_MODEL = 'bert'
-LEARNING_RATE = 1e-5
+LEARNING_RATE = 1e-4
 WEIGHT_DECAY = 1e-1
 EMBEDDING_LENGTH = 200
 VECTOR_DIMENSION = 768 if SPACY_MODEL == 'bert' else 300
 TRAIN_SIZE = 1.0
 TEST_SIZE = 0.2
-ADD_NOISE = False
-NOISE_STD = 0.4
-BINARY_CLASSIFICATION = False
+ADD_NOISE = True
+NOISE_STD = 0.25
+BINARY_CLASSIFICATION = True
 
 
 def train_model():
-    torch.autograd.set_detect_anomaly(True)
+    # retrieve data
+    dataloader_train = create_tensor_dataset("train", SPACY_MODEL, BATCH_SIZE, data_size=TRAIN_SIZE, flat_tensor=True,
+                                             binary_classification=BINARY_CLASSIFICATION)
+    dataloader_test = create_tensor_dataset("test", SPACY_MODEL, BATCH_SIZE, data_size=TEST_SIZE, flat_tensor=True,
+                                            binary_classification=BINARY_CLASSIFICATION)
+
     # Create model
-    model = SimpleFlatCNN(binary_classification=BINARY_CLASSIFICATION, embedding_length=EMBEDDING_LENGTH, vector_dimension=VECTOR_DIMENSION)
+    model = SimpleFlatCNN(binary_classification=BINARY_CLASSIFICATION, embedding_length=EMBEDDING_LENGTH,
+                          vector_dimension=VECTOR_DIMENSION)
 
     # set model to device
     model = model.to(DEVICE)
 
-    # retrieve data
-    dataloader_train, dataloader_test = create_tensor_dataset("train", SPACY_MODEL, BATCH_SIZE, train_size=TRAIN_SIZE, test_size=TEST_SIZE, flat_tensor=True, binary_classification=BINARY_CLASSIFICATION)
-
     # Create trainer
-    trainer = Trainer(model, DEVICE, lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY, binary_classification=BINARY_CLASSIFICATION)
+    trainer = Trainer(model, DEVICE, lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY,
+                      binary_classification=BINARY_CLASSIFICATION)
 
     # Train model
     trainer.train(dataloader_train, dataloader_test, epochs=EPOCHS, save_models=False, plot_loss=True,
-                  add_noise=ADD_NOISE, noise_std=NOISE_STD)
+                  add_noise=ADD_NOISE, noise_std=NOISE_STD, spacy_model=SPACY_MODEL)
+
+
+def test_model():
+    model = SimpleFlatCNN(binary_classification=BINARY_CLASSIFICATION, embedding_length=EMBEDDING_LENGTH,
+                          vector_dimension=VECTOR_DIMENSION)
+
+    model.load_state_dict(torch.load(f'models/SimpleFlatCNN/{SPACY_MODEL}.pt'))
+
+    model = model.to(DEVICE)
+
+    # Load test set
+    dataloader_test = create_tensor_dataset("test", SPACY_MODEL, BATCH_SIZE, data_size=TEST_SIZE, flat_tensor=True,
+                                            binary_classification=BINARY_CLASSIFICATION)
+
+    MAE = 0
+    test_accuracy = 0
+    all_outputs = []
+    all_targets = []
+    model.eval()
+    with torch.no_grad():
+        for features, target in dataloader_test:
+            features, target = features.to(DEVICE), target.to(DEVICE)
+            if BINARY_CLASSIFICATION:
+                outputs = model.forward_accuracy(features)
+                all_outputs.extend(outputs.cpu().numpy())
+                all_targets.extend(target.cpu().numpy())
+                test_accuracy += torch.sum(outputs == target).item()
+            else:
+                outputs = model.forward_score(features)
+                test_accuracy += outputs.eq(target).sum().item()
+                MAE += mean_absolute_error(target.cpu().numpy(), outputs.cpu().numpy())
+
+    print(f"Test accuracy: {test_accuracy / len(dataloader_test.dataset):.4f}")
+
+    if BINARY_CLASSIFICATION:
+        print(f"F1 score: {f1_score(all_targets, all_outputs):.4f}")
+        print(f"Precision: {precision_score(all_targets, all_outputs):.4f}")
+        print(f"Recall: {recall_score(all_targets, all_outputs):.4f}")
+        print(f"classification report: {classification_report(all_targets, all_outputs, digits=4)}")
+    else:
+        print(f"MAE: {MAE / len(dataloader_test):.4f}")
+
+
 
 
 def main():
     set_seed(SEED)
     train_model()
+    #test_model()
 
 
 if __name__ == '__main__':

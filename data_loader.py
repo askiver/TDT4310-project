@@ -30,52 +30,40 @@ def load_movie_reviews(binary_classification, spacy_model='sm', data_size=0.2, d
 
 
 # Class for loading word embeddings from file
-def create_tensor_dataset(data_type, spacy_model='sm', batch_size=32, test_size=0.2, train_size=0.2, flat_tensor=False,
+def create_tensor_dataset(data_type, spacy_model='sm', batch_size=32, data_size=0.2, flat_tensor=False,
                           binary_classification=True):
+    data_length = int(25000 * data_size)
+    vector_dimension = 768 if spacy_model == 'bert' else 300
+
+    all_data = np.empty((data_length, 200, vector_dimension), dtype=np.float32)
+    all_labels = np.empty(data_length, dtype=np.float32)
     # Load data
-    positive_embeddings_train, positive_labels_train = load_movie_reviews(binary_classification, spacy_model,
-                                                                          data_size=train_size,
-                                                                          data_type='train', data_label='pos')
-    negative_embeddings_train, negative_labels_train = load_movie_reviews(binary_classification, spacy_model,
-                                                                          data_size=train_size,
-                                                                          data_type='train', data_label='neg')
+    all_data[:data_length // 2], all_labels[:data_length // 2] = load_movie_reviews(binary_classification, spacy_model,
+                                                                                    data_size=data_size,
+                                                                                    data_type=data_type,
+                                                                                    data_label='pos')
 
-    # Combine data
-    embeddings_train = np.concatenate([positive_embeddings_train, negative_embeddings_train], axis=0)
-    labels_train = np.concatenate([positive_labels_train, negative_labels_train], axis=0)
-
-    positive_embeddings_test, positive_labels_test = load_movie_reviews(binary_classification, spacy_model,
-                                                                        data_size=test_size,
-                                                                        data_type='test', data_label='pos')
-    negative_embeddings_test, negative_labels_test = load_movie_reviews(binary_classification, spacy_model,
-                                                                        data_size=test_size,
-                                                                        data_type='test', data_label='neg')
-
-    embeddings_test = np.concatenate([positive_embeddings_test, negative_embeddings_test], axis=0)
-    labels_test = np.concatenate([positive_labels_test, negative_labels_test], axis=0)
+    all_data[data_length // 2:], all_labels[data_length // 2:] = load_movie_reviews(binary_classification, spacy_model,
+                                                                                    data_size=data_size,
+                                                                                    data_type=data_type,
+                                                                                    data_label='neg')
 
     # Convert to tensors
-    embeddings_train = torch.tensor(embeddings_train, dtype=torch.float32)
-    embeddings_test = torch.tensor(embeddings_test, dtype=torch.float32)
-    labels_train = torch.tensor(labels_train, dtype=torch.float32)
-    labels_test = torch.tensor(labels_test, dtype=torch.float32)
+    embeddings = torch.from_numpy(all_data)
+    labels = torch.from_numpy(all_labels)
 
     if flat_tensor:
         # Transpose tensor
-        embeddings_train = embeddings_train.transpose(1, 2)
-        embeddings_test = embeddings_test.transpose(1, 2)
+        embeddings = embeddings.transpose(1, 2)
 
     else:
         # insert channel dimension
-        embeddings_train = embeddings_train.unsqueeze(1)
-        embeddings_test = embeddings_test.unsqueeze(1)
+        embeddings = embeddings.unsqueeze(1)
 
     # Create dataset
-    dataset_train = TensorDataset(embeddings_train, labels_train)
-    dataset_test = TensorDataset(embeddings_test, labels_test)
+    dataset = TensorDataset(embeddings, labels)
 
     # create dataloader
-    dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
-    dataloader_test = DataLoader(dataset_test, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
 
-    return dataloader_train, dataloader_test
+    return dataloader
