@@ -7,7 +7,10 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from utils import load_combined_reviews
 
+# File that generates word embeddings
 
+
+# dataset class used for BERT embeddings
 class ReviewDataset(Dataset):
     def __init__(self, reviews, tokenizer, max_length=512):
         self.tokenizer = tokenizer
@@ -40,10 +43,10 @@ def save_word_embeddings(data_type, data_label, word_embeddings, scores, spacy_m
         hdf.create_dataset('scores', data=scores, dtype=np.int8)
 
 
-def create_embedding_bert(reviews, model, tokenizer, vector_length=768, embedding_length=200):
+def create_embedding_bert(reviews, model, tokenizer, embedding_length=200):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
-    model.eval()  # Set model to evaluation mode
+    model.eval()
 
     # Create the dataset and data loader
     dataset = ReviewDataset(reviews, tokenizer)
@@ -72,12 +75,8 @@ def create_embedding_bert(reviews, model, tokenizer, vector_length=768, embeddin
     return embeddings
 
 
-def create_dataset(bert_model, bert_tokenizer, data_type, data_label, spacy_model, embedding_length, vector_length):
+def create_dataset(bert_model, bert_tokenizer, data_type, data_label, spacy_model):
     reviews, scores = load_combined_reviews(data_type, data_label)
-
-    # Limit amount of reviews for testing
-    reviews = reviews
-    scores = scores
 
     if spacy_model == 'bert':
         embeddings = create_embedding_bert(reviews, bert_model, bert_tokenizer)
@@ -91,8 +90,6 @@ def main():
     spacy_model = 'lg'
     data_types = ['train', 'test']
     labels = ['pos', 'neg']
-    embedding_length = 200
-    vector_length = 768 if spacy_model == 'bert' else 300
 
     tokenizer = None
     model = None
@@ -102,9 +99,7 @@ def main():
         model = RobertaModel.from_pretrained('roberta-base')
     for data_type in data_types:
         for label in labels:
-            create_dataset(model, tokenizer, data_type, label, spacy_model=spacy_model,
-                           embedding_length=embedding_length,
-                           vector_length=vector_length)
+            create_dataset(model, tokenizer, data_type, label, spacy_model=spacy_model)
             print(f'Finished creating {data_type} {label} dataset')
 
 

@@ -1,9 +1,8 @@
 from transformers import RobertaTokenizer, RobertaForSequenceClassification, Trainer, TrainingArguments
 import torch
-from utils import load_movie_reviews, load_combined_reviews
+from utils import load_combined_reviews
 import numpy as np
-from sklearn.metrics import accuracy_score, mean_squared_error, mean_absolute_error, classification_report, \
-    precision_recall_fscore_support
+from sklearn.metrics import accuracy_score, mean_squared_error, mean_absolute_error, precision_recall_fscore_support
 
 
 def compute_metrics_binary(eval_pred):
@@ -121,58 +120,8 @@ def train_transformer_model(binary_classification=True):
     model.save_pretrained('models/transformer_model')
 
 
-def test_model(binary_classification=True):
-    DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    num_labels = 2 if binary_classification else 1
-    model  = RobertaForSequenceClassification.from_pretrained('models/transformer_model', num_labels=num_labels).to(
-        'cuda' if torch.cuda.is_available() else 'cpu')
-
-    #model.load_state_dict(torch.load(f'models/transformer_model/config.json'))
-
-    # Load test set
-    pos_test, pos_test_scores = load_combined_reviews('test', 'pos')
-    neg_test, neg_test_scores = load_combined_reviews('test', 'neg')
-    test = pos_test + neg_test
-    if binary_classification:
-        target_test = [1] * len(pos_test) + [0] * len(neg_test)
-    else:
-        target_test = np.concatenate((np.array(pos_test_scores), np.array(neg_test_scores)), dtype=np.float32)
-
-    tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
-
-    # Tokenize all texts
-    test_encodings = tokenizer(test, truncation=True, padding=True, max_length=256)
-
-    # Create datasets
-    test_dataset = SentimentDataset(test_encodings, target_test)
-
-    MAE = 0
-    test_accuracy = 0
-    all_outputs = []
-    all_targets = []
-    model.eval()
-    with torch.no_grad():
-        for data in test_dataset:
-            features, target = data['input_ids'].to(DEVICE), data['labels'].to(
-                DEVICE)  # Assuming input_ids and labels are keys
-            outputs = model(features)
-            if binary_classification:
-                predictions = torch.argmax(outputs, dim=1)
-                test_accuracy += (predictions == target).sum().item()
-            else:
-                outputs = model.forward_score(features)
-                test_accuracy += outputs.eq(target).sum().item()
-                MAE += mean_absolute_error(target.cpu().numpy(), outputs.cpu().numpy())
-
-    print(f"Test accuracy: {test_accuracy / len(test_dataset.dataset):.4f}")
-
-    if binary_classification:
-        print(f"classification report: {classification_report(all_targets, all_outputs, digits=4)}")
-
-
 def main():
     train_transformer_model(binary_classification=False)
-    #test_model(binary_classification=True)
 
 
 if __name__ == '__main__':

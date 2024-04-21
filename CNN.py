@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 
 
+# File that contains the CNN models
+
+
 class CNN(nn.Module):
     def __init__(self, embedding_length=100, vector_dimension=768):
         super(CNN, self).__init__()
@@ -69,6 +72,7 @@ class LargeCNN(nn.Module):
         return torch.round(torch.sigmoid(x))
 
 
+# Cnn with parallel layers
 class FlatCNN(nn.Module):
     def __init__(self, embedding_length=200, vector_dimension=768, num_networks=3, network_depth=3, kernel_size=3,
                  output_channels=64):
@@ -118,7 +122,6 @@ class FlatCNN(nn.Module):
         x = self.forward(x)
         return torch.round(torch.sigmoid(x))
 
-
     def to(self, device):
         for net in self.conv_layers:
             for layer in net:
@@ -135,13 +138,16 @@ class FlatCNN(nn.Module):
 
 
 class SimpleFlatCNN(nn.Module):
-    def __init__(self, binary_classification=True, embedding_length=200, vector_dimension=300, kernel_size=5, output_channels=64):
+    def __init__(self, binary_classification=True, embedding_length=200, vector_dimension=300, kernel_size=5,
+                 output_channels=64):
         super(SimpleFlatCNN, self).__init__()
         self.name = "SimpleFlatCNN"
-        self.conv1 = nn.Conv1d(vector_dimension, output_channels, kernel_size=kernel_size, padding=(kernel_size - 1)//2)
-        self.conv2 = nn.Conv1d(output_channels, output_channels * 2, kernel_size=kernel_size, padding=(kernel_size - 1)//2)
+        self.conv1 = nn.Conv1d(vector_dimension, output_channels, kernel_size=kernel_size,
+                               padding=(kernel_size - 1) // 2)
+        self.conv2 = nn.Conv1d(output_channels, output_channels * 2, kernel_size=kernel_size,
+                               padding=(kernel_size - 1) // 2)
         self.conv3 = nn.Conv1d(output_channels * 2, output_channels * 4, kernel_size=kernel_size,
-                               padding=(kernel_size - 1)//2)
+                               padding=(kernel_size - 1) // 2)
         self.fc1 = nn.Linear((output_channels * 4 * embedding_length) // 2 ** 3, 400)
         self.fc2 = nn.Linear(400, 200)
         self.fc3 = nn.Linear(200, 1)
@@ -180,6 +186,7 @@ class SimpleFlatCNN(nn.Module):
 
     def forward_score(self, x):
         x = self.forward(x)
+        # Clamp the score between 1 and 8
         x = torch.clamp(x, min=1, max=8)
         # Return the score rounded to the nearest integer
         return torch.round(x)

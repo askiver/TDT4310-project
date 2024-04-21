@@ -1,8 +1,9 @@
-import json
 import h5py
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
+
+# File responsible for loading data
 
 
 def load_data(file_path, data_size):
@@ -29,7 +30,6 @@ def load_movie_reviews(binary_classification, spacy_model='sm', data_size=0.2, d
     return data, labels
 
 
-# Class for loading word embeddings from file
 def create_tensor_dataset(data_type, spacy_model='sm', batch_size=32, data_size=0.2, flat_tensor=False,
                           binary_classification=True):
     data_length = int(25000 * data_size)

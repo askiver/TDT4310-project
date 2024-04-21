@@ -1,16 +1,16 @@
 import random
 import numpy as np
 import torch
-from sklearn.metrics import mean_absolute_error, f1_score, precision_score, recall_score, classification_report
-
-from CNN import CNN, LargeCNN, FlatCNN, SimpleFlatCNN
+from sklearn.metrics import mean_absolute_error, classification_report
+from CNN import SimpleFlatCNN
 from data_loader import create_tensor_dataset
 from trainer import Trainer
 
 
 def set_seed(seed=0):
-    #torch.backends.cudnn.deterministic = True
-    #torch.backends.cudnn.benchmark = False
+    # Include these lines to make the script reproducible
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = False
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -22,14 +22,14 @@ def set_seed(seed=0):
 SEED = 0
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 BATCH_SIZE = 32
-EPOCHS = 10
-SPACY_MODEL = 'bert'
+EPOCHS = 3
+SPACY_MODEL = 'lg'
 LEARNING_RATE = 1e-4
 WEIGHT_DECAY = 1e-1
 EMBEDDING_LENGTH = 200
 VECTOR_DIMENSION = 768 if SPACY_MODEL == 'bert' else 300
 TRAIN_SIZE = 1.0
-TEST_SIZE = 0.2
+TEST_SIZE = 1.0
 ADD_NOISE = True
 NOISE_STD = 0.25
 BINARY_CLASSIFICATION = True
@@ -59,11 +59,14 @@ def train_model():
 
 
 def test_model():
+    # Create model
     model = SimpleFlatCNN(binary_classification=BINARY_CLASSIFICATION, embedding_length=EMBEDDING_LENGTH,
                           vector_dimension=VECTOR_DIMENSION)
 
+    # Load saved model
     model.load_state_dict(torch.load(f'models/SimpleFlatCNN/{SPACY_MODEL}.pt'))
 
+    # set model to device
     model = model.to(DEVICE)
 
     # Load test set
@@ -91,20 +94,15 @@ def test_model():
     print(f"Test accuracy: {test_accuracy / len(dataloader_test.dataset):.4f}")
 
     if BINARY_CLASSIFICATION:
-        print(f"F1 score: {f1_score(all_targets, all_outputs):.4f}")
-        print(f"Precision: {precision_score(all_targets, all_outputs):.4f}")
-        print(f"Recall: {recall_score(all_targets, all_outputs):.4f}")
         print(f"classification report: {classification_report(all_targets, all_outputs, digits=4)}")
     else:
         print(f"MAE: {MAE / len(dataloader_test):.4f}")
 
 
-
-
 def main():
     set_seed(SEED)
     train_model()
-    #test_model()
+    test_model()
 
 
 if __name__ == '__main__':

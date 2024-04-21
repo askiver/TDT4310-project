@@ -3,22 +3,13 @@ import json
 import numpy as np
 
 
+# Removes html line breaks from reviews
 def remove_breaks(review):
     return review.replace('<br /><br />', '')
 
 
-def load_movie_reviews(folder):
-    reviews = []
-    for filename in os.listdir(folder):
-        filepath = f'{folder}/{filename}'
-        with open(filepath, 'r', encoding='utf-8') as file:
-            review = file.read()
-            reviews.append(remove_breaks(review))
-    return reviews
-
-
+# Combines training files into a single file containing all reviews and scores
 def create_combined_files(data_type, data_label):
-    # Combines training files into a single file containing all reviews
     reviews = []
     scores = []
     for filename in os.listdir(f'data/{data_type}/{data_label}'):
@@ -35,6 +26,7 @@ def create_combined_files(data_type, data_label):
         json.dump(combined_data, file)
 
 
+# Loads combined files
 def load_combined_reviews(data_type, data_label):
     filepath = f'data/combined/{data_type}_{data_label}.json'
     with open(filepath, 'r', encoding='utf-8') as json_file:

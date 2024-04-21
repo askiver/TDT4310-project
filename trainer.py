@@ -1,10 +1,7 @@
-import pathlib
-import datetime
 import torch
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-from torch.cuda.amp import GradScaler, autocast
-from sklearn.metrics import accuracy_score, mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_absolute_error
 
 
 def add_gaussian_noise(data, std=6):
@@ -21,9 +18,10 @@ class Trainer:
         self.device = device
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
         self.binary_classification = binary_classification
-        self.criterion = torch.nn.BCEWithLogitsLoss() if binary_classification else torch.nn.L1Loss()  #torch.nn.HuberLoss()
+        # Binary cross entropy loss for binary classification, MAE loss for regression
+        self.criterion = torch.nn.BCEWithLogitsLoss() if binary_classification else torch.nn.L1Loss()
 
-        # Loss history
+        # Loss history for plotting
         self.loss_train_history = []
         self.loss_test_history = []
         self.test_accuracy_history = []
@@ -45,7 +43,6 @@ class Trainer:
                 loss = self.criterion(outputs, target)
                 loss.backward()
                 self.optimizer.step()
-
                 train_loss.append(loss.item())
 
             test_loss = []
@@ -71,7 +68,6 @@ class Trainer:
                         test_accuracy += outputs.eq(target).sum().item()
                         mae += mean_absolute_error(target.cpu().numpy(), outputs.cpu().numpy())
 
-
             # Save loss
             self.loss_train_history.append((sum(train_loss) / len(train_loss)))
             self.loss_test_history.append((sum(test_loss) / len(test_loss)))
@@ -89,13 +85,11 @@ class Trainer:
                 if self.loss_test_history[-1] == min(self.loss_test_history):
                     torch.save(self.model.state_dict(), f"models/SimpleFlatCNN/{spacy_model}.pt")
 
-
         if plot_loss:
             self.plot_loss()
 
     def plot_loss(self):
-        # Create two different plots, one showing the loss and one showing the accuracy
-        # Create a figure and a set of subplots
+        # Creates plots showing loss and accuracy
         fig, axs = plt.subplots(1, 2, figsize=(12, 5))
 
         # Plot loss

@@ -1,10 +1,8 @@
-import os
 import numpy as np
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.model_selection import train_test_split
-from sklearn.naive_bayes import MultinomialNB, GaussianNB
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
 from sklearn import metrics
-from utils import remove_breaks, load_combined_reviews
+from utils import load_combined_reviews
 from sklearn.utils import shuffle
 
 
@@ -17,6 +15,7 @@ def train_bayes_model(binary_classification=True):
     train = np.concatenate((pos_train, neg_train))
     test = np.concatenate((pos_test, neg_test))
 
+    # Create target labels
     if binary_classification:
         target_train = [1] * len(pos_train) + [0] * len(neg_train)
         target_test = [1] * len(pos_test) + [0] * len(neg_test)
@@ -24,16 +23,24 @@ def train_bayes_model(binary_classification=True):
         target_train = np.concatenate((scores_train_pos, scores_train_neg))
         target_test = np.concatenate((scores_test_pos, scores_test_neg))
 
+    # Shuffle the data
     train, target_train = shuffle(train, target_train, random_state=0)
     test, target_test = shuffle(test, target_test, random_state=0)
 
+    # Create TF-IDF vectorizer
     vectorizer = TfidfVectorizer(stop_words='english', lowercase=False)
+
+    # Transform the data
     X_train = vectorizer.fit_transform(train)
     X_test = vectorizer.transform(test)
 
+    # Create Naive Bayes model
     model = MultinomialNB()
 
+    # Train the model
     model.fit(X_train, target_train)
+
+    # Predict the test data
     pred = model.predict(X_test)
 
     if binary_classification:
