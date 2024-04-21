@@ -22,14 +22,14 @@ def set_seed(seed=0):
 SEED = 0
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 BATCH_SIZE = 32
-EPOCHS = 3
+EPOCHS = 10
 SPACY_MODEL = 'lg'
 LEARNING_RATE = 1e-4
 WEIGHT_DECAY = 1e-1
 EMBEDDING_LENGTH = 200
 VECTOR_DIMENSION = 768 if SPACY_MODEL == 'bert' else 300
 TRAIN_SIZE = 1.0
-TEST_SIZE = 1.0
+TEST_SIZE = 0.2
 ADD_NOISE = True
 NOISE_STD = 0.25
 BINARY_CLASSIFICATION = True
@@ -54,7 +54,7 @@ def train_model():
                       binary_classification=BINARY_CLASSIFICATION)
 
     # Train model
-    trainer.train(dataloader_train, dataloader_test, epochs=EPOCHS, save_models=False, plot_loss=True,
+    trainer.train(dataloader_train, dataloader_test, epochs=EPOCHS, save_models=True, plot_loss=True,
                   add_noise=ADD_NOISE, noise_std=NOISE_STD, spacy_model=SPACY_MODEL)
 
 
